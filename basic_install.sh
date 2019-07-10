@@ -21,15 +21,26 @@
 ################################################################################
 
 # This is a quick-and-dirty script to install HubCommander.
-# This will first download and extract the slackhq/python-rtmbot, and then fetch
-# HubCommander into the plugins directory.
+# This will first download and extract the slackhq/python-rtmbot, and then place
+# HubCommander into the proper directory path.
 
 # After the files are fetched, the script will attempt to create the python virtual
 # environments and install all the python dependencies (PYTHON 3.5+ IS REQUIRED!)
 
-RTM_VERSION="0.3.0"
-RTM_PATH="python-rtmbot-${RTM_VERSION}"
+# You MUST run this from the parent directory that contains this script. So, if this
+# script is in a directory named "hubcommander", you must run this from:
+# ../hubcommander so that you issue: ./hubcommander/basic_install.sh
 
+echo "Checking if I am able to CD into the proper directory..."
+cd hubcommander
+if [ $? -ne 0 ]; then
+    echo "[X] DIRECTORY PATHS ARE WRONG. Source directory needs to be named 'hubcommander' and you"
+    echo "    must run this from the parent directory of 'hubcommander'!!"
+    exit -1
+fi
+cd ..
+RTM_VERSION="0.4.0"
+RTM_PATH="python-rtmbot-${RTM_VERSION}"
 echo "Installing HubCommander and all dependencies..."
 
 # Fetch the python-rtmbot in the parent directory of this one:
@@ -45,31 +56,62 @@ echo "[+] Completed extracted RTM bot"
 
 # Create the virtualenvs:
 echo "[-->] Creating venv in ${RTM_PATH}..."
-pyvenv venv
-source venv/bin/activate
-echo "[+] Created venv"
 
-# Install the dependencies for the rtmbot:
-echo "[-->] Installing rtmbot's dependencies..."
-pip install wheel
-pip install -r requirements.txt
-echo "[+] Completed installing rtmbot dependencies."
+if command -v pyvenv >/dev/null 2>&1 ; then
 
-# Install HubCommander
-echo "[-->] Moving HubCommander to the plugins dir..."
-mv ../hubcommander/* plugins/
-rm -Rf ../hubcommander
-echo "[+] Completed moving HubCommander to the plugins dir."
+  PYTHON_VERSION=`python --version 2>&1 | grep -i continuum`
+  if [[ $PYTHON_VERSION != "" ]]; then
+      echo "[+] Conda installation detected ..."
+      pyvenv venv --without-pip
+      source venv/bin/activate
 
-# Install the dependencies for HubCommander:
-echo "[-->] Installing HubCommander' dependencies..."
-pip install -r plugins/requirements.txt
-echo "[+] Completed installing HubCommander' dependencies."
+      echo "[-->] Installing PIP in venv..."
+      curl -O https://bootstrap.pypa.io/get-pip.py
+      python get-pip.py
+      echo "[+] PIP Installed"
+  else
+      pyvenv venv
+      source venv/bin/activate
+  fi
 
-echo "-------- What's left to do? --------"
-echo "At this point, you will need to create a 'rtmbot.conf' file as per the instructions for the rtmbot."
-echo "Additionally, you will need to perform all of the remaining configuration that is required for"
-echo "HubCommander. Please review the instructions for details."
+  echo "[+] Created venv"
 
-echo
-echo "DONE!"
+  # Install HubCommander
+  echo "[-->] Moving HubCommander to the correct dir..."
+  mv ../hubcommander hubcommander/
+  echo "[+] Completed moving HubCommander to the correct dir."
+
+  # Install the dependencies for the rtmbot:
+  echo "[-->] Installing rtmbot's dependencies..."
+  pip install wheel
+  pip install ./hubcommander/
+  echo "[+] Completed installing HubCommander's dependencies."
+
+  # May not be relevant anymore -- but can't hurt:
+  echo "[-->] Removing unnecessary files..."
+  # Need to delete the "setup.py" file because it interferes with the rtmbot:
+  rm -f hubcommander/setup.py
+  # Need to delete the "tests/" directory, because it also interferes with the rtmbot:
+  rm -Rf hubcommander/tests
+  echo "[-] Completed unnecessary file removal."
+
+  # Make a skeleton of the rtmbot.conf file:
+  echo "[-->] Creating the skeleton 'rtmbot.conf' file..."
+  echo 'DEBUG: True' > rtmbot.conf
+  echo 'SLACK_TOKEN: "'PLACE SLACK TOKEN HERE'"' >> rtmbot.conf
+  echo 'ACTIVE_PLUGINS:' >> rtmbot.conf
+  echo '    - hubcommander.hubcommander.HubCommander' >> rtmbot.conf
+  echo "[+] Completed the creation of the skeleton 'rtmbot.conf' file..."
+
+  echo
+  echo "-------- What's left to do? --------"
+  echo "At this point, you will need to modify the 'rtmbot.conf' file as per the instructions for the rtmbot."
+  echo "Additionally, you will need to perform all of the remaining configuration that is required for"
+  echo "HubCommander. Please review the instructions for details."
+
+  echo
+  echo "DONE!"
+else
+  echo "pyvenv is not installed. Install pyvenv to continue. Aborting."
+  exit 1;
+fi
